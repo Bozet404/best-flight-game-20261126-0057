@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<title>Selat Jakarta Run — Game Terbang</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a1420; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #fff; }
+  #game { display: block; width: 100vw; height: 100vh; touch-action: none; }
+
+  .hidden { display: none !important; }
+
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(6, 14, 24, 0.55); z-index: 10; padding: 16px;
+  }
+  .panel {
+    background: rgba(10, 22, 36, 0.92); border: 1px solid rgba(120, 180, 230, 0.35);
+    border-radius: 16px; padding: 28px 32px; max-width: 560px; width: 100%;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55); text-align: center;
+  }
+  .panel h1 { font-size: 34px; letter-spacing: 1px; color: #ffd34d; margin-bottom: 4px; }
+  .panel h2 { font-size: 15px; font-weight: 600; color: #9fd4ff; margin-bottom: 14px; }
+  .panel p { font-size: 14px; line-height: 1.55; color: rgba(255, 255, 255, 0.85); margin-bottom: 10px; }
+  .mission { text-align: left; margin: 12px auto 16px; max-width: 420px; font-size: 14px; line-height: 1.9; }
+  .mission b { color: #ffd34d; }
+  .keys {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; text-align: left;
+    font-size: 13px; color: rgba(255, 255, 255, 0.8); margin: 0 auto 16px; max-width: 440px;
+  }
+  .keys b { color: #fff; background: rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 1px 7px; font-family: monospace; }
+  .btn {
+    display: inline-block; border: none; border-radius: 10px; cursor: pointer;
+    font-size: 16px; font-weight: 700; padding: 13px 30px; margin: 4px;
+    background: #ff8c1a; color: #241300; transition: transform 0.08s, filter 0.15s;
+  }
+  .btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+  .btn:active { transform: translateY(1px); }
+  .btn.secondary { background: rgba(255, 255, 255, 0.14); color: #fff; font-weight: 600; font-size: 14px; padding: 11px 20px; }
+  .btn.small { font-size: 13px; padding: 8px 14px; }
+  .best { margin-top: 12px; font-size: 13px; color: #ffd34d; min-height: 18px; }
+
+  #howto {
+    display: none; text-align: left; font-size: 13px; line-height: 1.7;
+    background: rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;
+  }
+  #howto.open { display: block; }
+
+  .end-title { font-size: 32px; margin-bottom: 6px; }
+  .end-title.win { color: #7ddb8a; }
+  .end-title.lose { color: #ff6b5e; }
+  #end-score { font-size: 26px; font-weight: 800; color: #ffd34d; margin: 10px 0; }
+  #end-breakdown { margin: 8px auto 14px; max-width: 380px; text-align: left; font-size: 14px; }
+  #end-breakdown .row { display: flex; justify-content: space-between; padding: 5px 2px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+  #topbar {
+    position: fixed; top: 52px; right: 12px; z-index: 5; display: flex; gap: 8px;
+  }
+  #topbar .btn { margin: 0; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- Top-right controls, live during flight -->
+<div id="topbar" class="hidden">
+  <button id="btn-pause" class="btn secondary small" type="button">⏸ Jeda (P)</button>
+  <button id="btn-mute" class="btn secondary small" type="button">🔊 Suara: ON</button>
+  <button id="btn-restart" class="btn secondary small" type="button">↻ Ulang (R)</button>
+</div>
+
+<!-- Start menu -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>SELAT JAKARTA RUN</h1>
+    <h2>Game terbang di atas Kepulauan Seribu</h2>
+    <p>Pesawat kecilmu lepas landas dari pantai Jakarta di pagi hari.
+       Terbang ke utara melewati <b>8 ring</b> di atas laut, lalu
+       <b>mendarat</b> di landasan kecil Pulau Pari.</p>
+    <div class="mission">
+      <div><b>1.</b> Lepas landas — throttle sudah setengah, tinggal terbang</div>
+      <div><b>2.</b> Lewati 8 ring oranye — masing-masing +100 poin</div>
+      <div><b>3.</b> Mendarat pelan di landasan Pulau Pari — +500 poin</div>
+    </div>
+    <div class="keys">
+      <div><b>W / S</b> atau <b>↑ / ↓</b> — naik / turun</div>
+      <div><b>A / D</b> atau <b>← / →</b> — belok kiri / kanan</div>
+      <div><b>Q / E</b> — kemudi (rudder)</div>
+      <div><b>Shift / Ctrl</b> — throttle naik / turun</div>
+      <div><b>Spasi</b> — rem udara</div>
+      <div><b>Mouse</b> — arahkan pesawat (opsional)</div>
+      <div><b>P</b> — jeda &nbsp; <b>M</b> — suara &nbsp; <b>R</b> — ulang</div>
+      <div><b>Roda mouse</b> — throttle</div>
+    </div>
+    <button id="btn-start" class="btn" type="button">✈ MULAI TERBANG</button>
+    <button id="btn-how" class="btn secondary" type="button">Cara main</button>
+    <button id="btn-mouse" class="btn secondary" type="button">Mouse: OFF</button>
+    <button id="btn-mute-menu" class="btn secondary" type="button">🔊 Suara: ON</button>
+    <div id="howto">
+      Jaga kecepatan di atas 80 knot supaya tidak stall. Ikuti panah ring di
+      bawah kompas: ring berikutnya ditandai oranye dan berkedip. Mendekati
+      Pulau Pari, turunkan throttle, jaga kecepatan 60–90 knot, dan sentuh
+      landasan dengan pelan — pendaratan keras merusak pesawat. Jangan
+      menyentuh laut, pulau, atau kota.
+    </div>
+    <div id="best-score" class="best"></div>
+  </div>
+</div>
+
+<!-- Pause -->
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <h1 style="color:#9fd4ff">JEDA</h1>
+    <p>Pesawatmu menunggu di udara. Lanjutkan misinya.</p>
+    <button id="btn-resume" class="btn" type="button">▶ LANJUTKAN</button>
+    <button id="btn-menu" class="btn secondary" type="button">Menu Utama</button>
+  </div>
+</div>
+
+<!-- End of flight -->
+<div id="end" class="overlay hidden">
+  <div class="panel">
+    <div id="end-title" class="end-title win">MISI SELESAI ✈</div>
+    <p id="end-reason"></p>
+    <div id="end-score"></div>
+    <div id="end-breakdown"></div>
+    <div id="end-best" class="best"></div>
+    <button id="btn-restart-end" class="btn" type="button">↻ TERBANG LAGI</button>
+    <button id="btn-menu-end" class="btn secondary" type="button">Menu Utama</button>
+  </div>
+</div>
+
+<script src="src/config.js"></script>
+<script src="src/terrain.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/input.js"></script>
+<script src="src/render.js"></script>
+<script src="src/hud.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
